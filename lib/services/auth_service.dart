@@ -8,7 +8,9 @@ class AuthService {
   Map<String, String> _headers([String? token]) {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer ' + token;
+      final authKey = 'Authorization';
+      final authPrefix = 'Bearer';
+      headers[authKey] = authPrefix + ' ' + token;
     }
     return headers;
   }
