@@ -18,7 +18,7 @@ app.get('/auth/health', (req, res) => res.json({ ok: true }));
 
 function loadUsers(){
   if(!fs.existsSync(USERS_FILE)) return [];
-  return JSON.parse(fs.readFileSync(USERS_FILE));
+  try { return JSON.parse(fs.readFileSync(USERS_FILE)); } catch(e) { console.error('Failed to parse users.json', e); return []; }
 }
 function saveUsers(users){
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
@@ -171,4 +171,18 @@ app.delete('/users/:username', verifyToken, adminOnly, (req, res) => {
 })();
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log('Backend running on', PORT));
+
+// Start HTTP or HTTPS server depending on environment variables
+if (process.env.USE_HTTPS === '1' && process.env.SSL_CERT_PATH && process.env.SSL_KEY_PATH && fs.existsSync(process.env.SSL_CERT_PATH) && fs.existsSync(process.env.SSL_KEY_PATH)) {
+  try {
+    const https = require('https');
+    const cert = fs.readFileSync(process.env.SSL_CERT_PATH);
+    const key = fs.readFileSync(process.env.SSL_KEY_PATH);
+    https.createServer({ key, cert }, app).listen(PORT, () => console.log('Backend running (https) on', PORT));
+  } catch (e) {
+    console.error('Failed to start HTTPS server, falling back to HTTP', e);
+    app.listen(PORT, () => console.log('Backend running on', PORT));
+  }
+} else {
+  app.listen(PORT, () => console.log('Backend running on', PORT));
+}
