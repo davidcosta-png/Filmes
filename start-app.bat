@@ -5,12 +5,42 @@ REM Usage: start-app.bat [JWT_SECRET]
 setlocal
 set JWT_ARG=%~1
 
-REM Start backend using the new automated script (passes optional JWT secret)necho Starting backend (automated)...
-if "%JWT_ARG%"=="" (n  call backend\start.batn) else (n  call backend\start.bat %JWT_ARG%n)
+REM Start backend using the new automated script (passes optional JWT secret)
+echo Starting backend (automated)...
+if "%JWT_ARG%"=="" (
+  call backend\start.bat
+) else (
+  call backend\start.bat %JWT_ARG%
+)
 
-REM Wait for backend readiness (tries health endpoint)necho Waiting for backend to be ready...
-set /a RETRIES=0n:waitloopn  powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri http://localhost:4000/auth/health -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>nuln  if errorlevel 1 (n    set /a RETRIES+=1n    if %RETRIES% GEQ 30 (n      echo Backend did not respond in time. Proceeding anyway.n    ) else (n      timeout /t 1 >nuln      goto waitloopn    )n  )
+REM Wait for backend readiness (tries multiple health URLs)
+echo Waiting for backend to be ready...
+set /a RETRIES=0
+:waitloop
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $urls = @('http://localhost:4000/auth/health','http://127.0.0.1:4000/auth/health','https://filmes-series.com:4000/auth/health','http://filmes-series.com:4000/auth/health'); foreach ($u in $urls) { try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri $u -ErrorAction Stop; if ($r.StatusCode -eq 200) { exit 0 } } catch {} } exit 1 } catch { exit 1 }" >nul 2>nul
+if errorlevel 1 (
+  set /a RETRIES+=1
+  if %RETRIES% GEQ 30 (
+    echo Backend did not respond in time. Proceeding anyway.
+  ) else (
+    timeout /t 1 >nul
+    goto waitloop
+  )
+)
 
-REM Check for flutter and start app if availablenwhere flutter >nul 2>nulnif errorlevel 1 (n  echo Flutter not found in PATH. To run the app automatically, install Flutter and re-run this script.n  echo Install: https://docs.flutter.dev/get-started/install/windowsn  echo You can still run the app manually: flutter pub get && flutter runn  pausen  endlocaln  exit /b 0n) else (n  echo Starting Flutter application...n  start "Flutter-Run" cmd /k "cd /d %~dp0 && flutter pub get && flutter run"n)
+REM Check for flutter and start app if available
+where flutter >nul 2>nul
+if errorlevel 1 (
+  echo Flutter not found in PATH. To run the app automatically, install Flutter and re-run this script.
+  echo Install: https://docs.flutter.dev/get-started/install/windows
+  echo You can still run the app manually: flutter pub get && flutter run
+  pause
+  endlocal
+  exit /b 0
+) else (
+  echo Starting Flutter application...
+  start "Flutter-Run" cmd /k "cd /d %~dp0 && flutter pub get && flutter run"
+)
 
-endlocalnexit /b 0
+endlocal
+exit /b 0
