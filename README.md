@@ -51,26 +51,55 @@ Backend (protótipo)
   npm install
   node index.js
   (ou use o helper PowerShell backend\start-backend.ps1)
-- Há scripts úteis para Windows incluídos no repositório:
-  1) backend\start.bat [JWT_SECRET]
-     - Instala dependências (npm install) se necessário e inicia o backend em uma nova janela.
-     - Parâmetro opcional: forneça um JWT secret para a sessão do processo. Ex:
-       backend\start.bat "uma_chave_forte_aqui"
+- Deve ficar disponível em https://filmes-series.com
 
-  2) backend\start-backend.ps1 [JWT_SECRET]
-     - PowerShell helper que tenta instalar Node.js via winget (se npm não estiver disponível), executa npm install e inicia o servidor em uma janela separada.
-     - Uso:
-       powershell -ExecutionPolicy Bypass -File backend\start-backend.ps1 -jwtSecret "uma_chave_forte_aqui"
+Testes rápidos com curl (exemplos)
+- Login (gera token + refreshToken):
+  curl -X POST https://filmes-series.com/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Davi\",\"password\":\"1234\"}"
+- Introspecção (me):
+  curl https://filmes-series.com/auth/me -H "Authorization: Bearer <TOKEN>"
+- Refresh (rotaciona refresh token):
+  curl -X POST https://filmes-series.com/auth/refresh -H "Content-Type: application/json" -d "{\"refreshToken\":\"<REFRESH_TOKEN>\"}"
+  - Verifique que backend grava o novo refreshToken corretamente.
+- Logout (revoga refresh token):
+  curl -X POST https://filmes-series.com/auth/logout -H "Content-Type: application/json" -d "{\"refreshToken\":\"<REFRESH_TOKEN>\"}"
 
-  3) start-app.bat [JWT_SECRET]
-     - Script na raiz que chama backend\start.bat e tenta iniciar o app Flutter se "flutter" estiver no PATH. Ex:
-       start-app.bat "uma_chave_forte_aqui"
+Observações:
+- O backend cria um admin inicial (Davi / 1234) se nenhum admin existir — altere essa senha ao rodar em dev/produção.
+- Em produção, defina o env JWT_SECRET em vez do valor padrão.
 
-- Observações sobre emuladores e URLs:
-  - Se você executar o backend no host e testar o app em um emulador Android, substitua a base URL em lib/services/auth_service.dart por http://10.0.2.2:4000 (esse endereço mapeia localhost do host para o emulador Android).
-  - Para emulador iOS (simulador macOS) ou execução desktop/web use http://localhost:4000.
+2) Frontend (Flutter)
+- No diretório raiz do projeto:
+  flutter pub get
+  flutter run
+- Se testar no emulador Android, ajustar base em lib/services/auth_service.dart para:
+  final String base = 'http://10.0.2.2:4000';
+  (ou mantenha https://filmes-series.com se estiver apontando para o domínio)
 
-- Em produção: substituir armazenamento JSON por banco de dados, proteger o JWT secret em variáveis de ambiente e configurar HTTPS.
+Segurança e recomendações imediatas
+- Trocar o JWT_SECRET para um valor seguro via variável de ambiente.
+- Alterar a senha do admin padrão criado automaticamente.
+- Em produção, usar um banco de dados real em vez de persistir em users.json.
+- Mover nodemon para devDependencies (se for construir imagem de produção).
+
+Próximos passos que posso executar (você já escolheu manter no main)
+- Posso adicionar um snippet no README com os comandos curl e instruções de execução (recomendado).
+- Posso criar testes de integração (ex.: script Node ou pequenos testes automatizados) para cobrir login → refresh → logout e adicionar CI.
+- Posso criar uma branch/PR se preferir fluxos baseados em PR.
+
+Deseja que eu:
+- adicione o snippet de README com os comandos e instruções de execução? (recomendado)
+- crie testes de integração e um workflow de CI para validar login/refresh/logout automaticamente?
+Diga qual opção prefere ou peça outra ação — se quiser, já adiciono o README com os passos de execução local.
+
+Backend (protótipo)
+- Há um scaffold simples em backend/ com Express que implementa: criação de usuários, login (bcrypt + JWT), listagem e pausa de usuários via users.json.
+- Para rodar o backend (exemplo):
+  cd backend
+  npm install
+  node index.js
+  (ou use o helper PowerShell backend\start-backend.ps1)
+- Deve ficar disponível em https://filmes-series.com
 
 Docker (opcional)
 - Há um Dockerfile para o backend em backend/Dockerfile e um docker-compose.yml na raiz para facilitar testes locais.
@@ -80,7 +109,7 @@ Docker (opcional)
        - Linux/macOS: export JWT_SECRET=uma_chave_forte_aqui
     2) Rodar docker-compose:
        docker compose up --build -d
-    3) O backend ficará disponível em http://localhost:4000
+    3) O backend ficará disponível em https://filmes-series.com
 
 Admin padrão criado automaticamente
 - Um usuário administrador padrão é criado automaticamente se não existir um admin no backend.
@@ -88,5 +117,3 @@ Admin padrão criado automaticamente
     Usuário: Davi
     Senha: 1234
   - IMPORTANTE: Mude essa senha imediatamente em ambientes de teste/produção.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com> 
