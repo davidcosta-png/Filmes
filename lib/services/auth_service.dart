@@ -80,5 +80,3 @@ class AuthService {
     if (res.statusCode != 201) throw Exception('Failed to create user: ${res.body}');
   }
 }
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com> 
