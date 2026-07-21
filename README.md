@@ -14,43 +14,38 @@ Visão geral das mudanças importantes
 - Scripts e docker-compose foram atualizados para facilitar execução em desenvolvimento e produção (traefik optional para TLS/Let's Encrypt).
 - Há automação para configurar hosts/mkcert no Windows via backend/start-backend.ps1 e um wrapper start-app.bat para iniciar backend + Flutter em sequência.
 
-Como usar (desenvolvimento local, Windows)
-1) Executar tudo automaticamente (Windows):
-   - Abra PowerShell como Administrador (recomendado para hosts/mkcert) ou execute start-app.bat que solicitará elevação quando necessário.
-   - Na raiz do repositório, execute:
-     start-app.bat "uma_chave_forte_para_JWT"
-   - O script irá:
-     - instalar dependências do backend (npm install),
-     - (opcional) mapear filmes-series.com para 127.0.0.1 no hosts,
-     - (opcional) instalar/generar certificados mkcert em backend/certs/ para filmes-series.com,
-     - iniciar o backend (HTTPS se certs presentes),
-     - aguardar readiness e iniciar o app Flutter automaticamente (se flutter estiver no PATH).
+Key recent additions
+- Migration script: backend/migrate-sqlite-to-postgres.js — copies users from existing SQLite DB to Postgres (idempotent upsert).
+- Scheduled encrypted backups: docker-compose.prod.yml includes a backup-runner service that runs backup-and-upload.js periodically (interval via BACKUP_INTERVAL_SECONDS, default once per day).
+- CLI backup: npm run backup in backend will produce encrypted backup (if BACKUP_KEY set) and upload to S3 if BACKUP_S3_BUCKET is configured.
 
-2) Executar apenas o backend (manualmente):
+How to migrate existing local data to Postgres (one-time)
+1) Ensure you have a Postgres server and set POSTGRES_URL or use docker-compose.prod.yml (it provides a postgres service).
+2) If using docker-compose.prod.yml locally, set .env with POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB and run:
+   docker compose -f docker-compose.prod.yml up -d postgres
+3) Run the migration script (locally or in a container that has access to both DBs):
    cd backend
    npm ci
-   npm start
+   POSTGRES_URL="postgresql://user:pass@host:5432/dbname" node migrate-sqlite-to-postgres.js
+4) After migration, point backend to Postgres in production by setting POSTGRES_URL (or using docker compose which sets it automatically).
 
-3) Testes de integração (local):
-   cd backend
-   npm run test:integration
+Scheduled backups (production)
+- The docker-compose.prod.yml includes a backup-runner service. Configure these env vars in your .env or orchestration:
+  - BACKUP_S3_BUCKET (optional) — if set, backups are uploaded to S3
+  - AWS_REGION (required for S3 upload)
+  - BACKUP_KEY (recommended) — 32-byte key in base64 or hex to encrypt backups
+  - BACKUP_S3_PREFIX (optional) — prefix in bucket
+  - BACKUP_INTERVAL_SECONDS (optional) — default 86400 (once per day)
 
-Produção (expor para a internet, recomendado)
-- Opção 1 — Docker Compose + Traefik (recomendado para automação TLS):
-  1) Configure DNS para apontar seu domínio (ex: filmes-series.com) para o servidor público onde irá executar o Docker host.
-  2) Crie um arquivo .env com as variáveis necessárias:
-     DOMAIN=filmes-series.com
-     LETSENCRYPT_EMAIL=you@example.com
-     JWT_SECRET=uma_chave_forte
-     ADMIN_USER=nome_admin
-     ADMIN_PASS=senha_forte
-  3) Execute:
-     docker compose -f docker-compose.prod.yml up --build -d
-  - O Traefik neste compose tentará obter certificados Let's Encrypt automaticamente para DOMAIN. Certifique-se de que a porta 80/443 do servidor estão abertas e que o domínio resolve para o servidor.
+To run backups manually:
+  cd backend
+  npm run backup
 
-- Opção 2 — Docker Compose simples (local/VM):
-  - docker compose up --build -d
-  - O arquivo docker-compose.yml monta backend/data em ./backend/data, garantindo persistência do SQLite DB entre reinícios.
+Migration, HA and production notes
+- For high availability, use a managed Postgres service and run multiple backend replicas behind a load balancer.
+- The backup system will produce encrypted backups if BACKUP_KEY provided. Keep BACKUP_KEY secure and rotate as needed.
+
+All changes committed to main branch. See backend/ for scripts and docker-compose.prod.yml for production deployment.
 
 Persistência e resiliência das credenciais de administrador
 - A migração para SQLite (backend/data/users.db) significa que as credenciais de administrador permanecem em disco e não são perdidas se o processo cair.
@@ -74,7 +69,7 @@ Segurança e recomendações
 
 Endpoints úteis
 - POST /auth/login  -> { username, password }
-- GET /auth/me  -> Authorization: Bearer <token>
+- GET /auth/me  -> Authorization: ******
 - POST /auth/refresh -> { refreshToken }
 - POST /auth/logout -> { refreshToken }
 - POST /admin/backup -> (admin only) cria backup do DB em backend/data/backups/
