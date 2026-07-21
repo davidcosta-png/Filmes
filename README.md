@@ -64,6 +64,28 @@ Testes rápidos com curl (exemplos)
 - Logout (revoga refresh token):
   curl -X POST https://filmes-series.com/auth/logout -H "Content-Type: application/json" -d "{\"refreshToken\":\"<REFRESH_TOKEN>\"}"
 
+Local testing with filmes-series.com (recommended)
+- To test locally using the domain filmes-series.com, map the domain to localhost in your hosts file and (optionally) configure TLS for local HTTPS:
+
+  1) Edit hosts file (requires admin privileges):
+     - Windows: edit C:\Windows\System32\drivers\etc\hosts and add:
+       127.0.0.1 filmes-series.com
+     - macOS / Linux: edit /etc/hosts and add:
+       127.0.0.1 filmes-series.com
+
+  2) Start the backend (example):
+     cd backend
+     npm install
+     npm start
+
+  3) Configure the frontend to use lib/config.dart (BACKEND_BASE). By default BACKEND_BASE is set to https://filmes-series.com in lib/config.dart. If you do not intend to use HTTPS locally, change it to http://localhost:4000 or http://10.0.2.2:4000 for Android emulator.
+
+  Optional: enable HTTPS locally with mkcert (recommended if you use HTTPS in the app):
+  - Install mkcert: https://github.com/FiloSottile/mkcert
+  - Run: mkcert -install
+  - Generate certs: mkcert filmes-series.com
+  - Use a small reverse proxy (nginx) or Docker to serve the backend with the generated certs and the filmes-series.com hostname.
+
 Observações:
 - O backend cria um admin inicial (Davi / 1234) se nenhum admin existir — altere essa senha ao rodar em dev/produção.
 - Em produção, defina o env JWT_SECRET em vez do valor padrão.
@@ -72,8 +94,8 @@ Observações:
 - No diretório raiz do projeto:
   flutter pub get
   flutter run
-- Se testar no emulador Android, ajustar base em lib/services/auth_service.dart para:
-  final String base = 'http://10.0.2.2:4000';
+- Se testar no emulador Android, ajustar base em lib/config.dart para:
+  const String BACKEND_BASE = 'http://10.0.2.2:4000';
   (ou mantenha https://filmes-series.com se estiver apontando para o domínio)
 
 Segurança e recomendações imediatas
