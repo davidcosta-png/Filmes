@@ -1,21 +1,17 @@
-FROM node:18-alpine
-
-# Create app directory
+# Builder stage
+FROM node:18-alpine AS builder
 WORKDIR /usr/src/app
-
-# Install app dependencies
 COPY package.json package-lock.json* ./
-RUN npm install --production --silent
+RUN npm ci --production --silent
 
-# Bundle app source
-COPY . .
-
-EXPOSE 4000
-
+# Runtime stage
+FROM node:18-alpine
+WORKDIR /usr/src/app
 ENV NODE_ENV=production
-# Default JWT secret - override via environment variable in production
+# copy node_modules from builder
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+# copy app source
+COPY . .
+EXPOSE 4000
 ENV JWT_SECRET=replace_with_secure_secret_in_production
-
 CMD [ "node", "index.js" ]
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com> 
