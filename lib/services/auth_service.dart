@@ -3,14 +3,21 @@ import 'package:http/http.dart' as http;
 import '../config.dart';
 
 class AuthService {
-  // Backend base URL comes from lib/config.dart (BACKEND_BASE)
   final String base = BACKEND_BASE;
+
+  Map<String, String> _headers([String? token]) {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final url = Uri.parse('$base/auth/login');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(),
       body: json.encode({'username': username, 'password': password}),
     );
     if (res.statusCode == 200) return json.decode(res.body) as Map<String, dynamic>;
@@ -19,7 +26,7 @@ class AuthService {
 
   Future<Map<String, dynamic>> me(String token) async {
     final url = Uri.parse('$base/auth/me');
-    final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+    final res = await http.get(url, headers: _headers(token));
     if (res.statusCode == 200) return json.decode(res.body) as Map<String, dynamic>;
     throw Exception('Failed to validate token: ${res.body}');
   }
@@ -28,7 +35,7 @@ class AuthService {
     final url = Uri.parse('$base/auth/refresh');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(),
       body: json.encode({'refreshToken': refreshToken}),
     );
     if (res.statusCode == 200) return json.decode(res.body) as Map<String, dynamic>;
@@ -39,7 +46,7 @@ class AuthService {
     final url = Uri.parse('$base/auth/logout');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(),
       body: json.encode({'refreshToken': refreshToken}),
     );
     if (res.statusCode != 200) throw Exception('Failed to logout: ${res.body}');
@@ -47,7 +54,7 @@ class AuthService {
 
   Future<List<Map<String, dynamic>>> getUsers(String token) async {
     final url = Uri.parse('$base/users');
-    final res = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+    final res = await http.get(url, headers: _headers(token));
     if (res.statusCode == 200) {
       final body = json.decode(res.body) as List;
       return body.cast<Map<String, dynamic>>();
@@ -59,7 +66,7 @@ class AuthService {
     final url = Uri.parse('$base/users/$username/pause');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      headers: _headers(token),
       body: json.encode({'paused': paused}),
     );
     if (res.statusCode != 200) throw Exception('Failed to pause user: ${res.body}');
@@ -67,7 +74,7 @@ class AuthService {
 
   Future<void> deleteUser(String token, String username) async {
     final url = Uri.parse('$base/users/$username');
-    final res = await http.delete(url, headers: {'Authorization': 'Bearer $token'});
+    final res = await http.delete(url, headers: _headers(token));
     if (res.statusCode != 200) throw Exception('Failed to delete user: ${res.body}');
   }
 
@@ -75,7 +82,7 @@ class AuthService {
     final url = Uri.parse('$base/users');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      headers: _headers(token),
       body: json.encode({'username': username, 'password': password, 'role': role}),
     );
     if (res.statusCode != 201) throw Exception('Failed to create user: ${res.body}');
