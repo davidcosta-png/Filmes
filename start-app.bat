@@ -1,5 +1,5 @@
 @echo off
-REM start-app.bat - Fully automated start: starts backend (with hosts/mkcert setup) and then starts Flutter if available.
+REM start-app.bat - Fully automated start: starts backend (with hosts mapping) and then starts Flutter if available.
 REM Usage: start-app.bat [JWT_SECRET]
 
 setlocal
@@ -8,16 +8,16 @@ set JWT_ARG=%~1
 REM Start backend using the new automated script (passes optional JWT secret)
 echo Starting backend (automated)...
 if "%JWT_ARG%"=="" (
-  call backend\start.bat
+  call backend\start.bat --no-https
 ) else (
-  call backend\start.bat %JWT_ARG%
+  call backend\start.bat %JWT_ARG% --no-https
 )
 
 REM Wait for backend readiness (tries multiple health URLs)
 echo Waiting for backend to be ready...
 set /a RETRIES=0
 :waitloop
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $urls = @('http://localhost:4000/auth/health','http://127.0.0.1:4000/auth/health','https://filmes-series.com:4000/auth/health','http://filmes-series.com:4000/auth/health'); foreach ($u in $urls) { try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri $u -ErrorAction Stop; if ($r.StatusCode -eq 200) { exit 0 } } catch {} } exit 1 } catch { exit 1 }" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $urls = @('http://localhost:4000/auth/health','http://127.0.0.1:4000/auth/health','http://filmes-series.com:4000/auth/health','https://filmes-series.com:4000/auth/health'); foreach ($u in $urls) { try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri $u -ErrorAction Stop; if ($r.StatusCode -eq 200) { exit 0 } } catch {} } exit 1 } catch { exit 1 }" >nul 2>nul
 if errorlevel 1 (
   set /a RETRIES+=1
   if %RETRIES% GEQ 30 (
