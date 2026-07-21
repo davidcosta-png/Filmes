@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class AuthService {
   // If testing on Android emulator use 10.0.2.2 instead of localhost
-  final String base = 'http://localhost:4000';
+  final String base = 'https://filmes-series.com';
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final url = Uri.parse('$base/auth/login');
