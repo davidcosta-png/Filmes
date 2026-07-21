@@ -6,136 +6,81 @@ Objetivo
 
 Requisitos
 - Flutter SDK instalado (Windows): https://docs.flutter.dev/get-started/install/windows
-- Versão mínima do Dart/Flutter conforme seu SDK.
+- Node.js (LTS) para o backend: https://nodejs.org/
+- Docker & Docker Compose (opcional, para produção/local Docker).
 
-Como usar
-1. Instalar Flutter conforme o link acima e adicionar ao PATH.
-2. Abrir um terminal na pasta do projeto:
-   C:\Users\Usuário\Documents\Projet\stream_aggregator
-3. Copiar o arquivo de configuração de exemplo:
-   cd lib
-   copy config.sample.dart config.dart
-   Editar lib\config.dart e colocar sua chave TMDB em TMDB_API_KEY
-4. Obter dependências e rodar:
-   flutter pub get
-   flutter run
+Visão geral das mudanças importantes
+- O backend agora usa SQLite (better-sqlite3) para armazenar usuários e refresh tokens em backend/data/users.db — isso garante persistência mesmo se o processo ou servidor cair.
+- Scripts e docker-compose foram atualizados para facilitar execução em desenvolvimento e produção (traefik optional para TLS/Let's Encrypt).
+- Há automação para configurar hosts/mkcert no Windows via backend/start-backend.ps1 e um wrapper start-app.bat para iniciar backend + Flutter em sequência.
 
-Notas importantes
-- Este é um protótipo: não tenta "agregar" streams de plataformas proprietárias. Em vez disso, mostra como estruturar:
-  - Autenticação local (SharedPreferences)
-  - Abas por categoria
-  - Temas (dark/light)
-  - Busca usando a API pública do TMDB (metadados em pt-BR)
-- Para integrar streams legítimos, será necessário implementar:
-  - Contratos/licenças com provedores de conteúdo
-  - Proxies/serviços server-side para gerenciar credenciais e DRM
+Como usar (desenvolvimento local, Windows)
+1) Executar tudo automaticamente (Windows):
+   - Abra PowerShell como Administrador (recomendado para hosts/mkcert) ou execute start-app.bat que solicitará elevação quando necessário.
+   - Na raiz do repositório, execute:
+     start-app.bat "uma_chave_forte_para_JWT"
+   - O script irá:
+     - instalar dependências do backend (npm install),
+     - (opcional) mapear filmes-series.com para 127.0.0.1 no hosts,
+     - (opcional) instalar/generar certificados mkcert em backend/certs/ para filmes-series.com,
+     - iniciar o backend (HTTPS se certs presentes),
+     - aguardar readiness e iniciar o app Flutter automaticamente (se flutter estiver no PATH).
 
-Admin e usuários
-- Conta admin de teste incluída: usuário=admin senha=admin (apenas protótipo)
-- Em produção implementar backend com controle de usuários, roles e políticas de bloqueio/pausa.
+2) Executar apenas o backend (manualmente):
+   cd backend
+   npm ci
+   npm start
 
-Próximos passos sugeridos
-- Implementar backend (Node/Django/Go) com autenticação, controle de usuários e links oficiais
-- Implementar player com suporte a DRM (Widevine/PlayReady) para conteúdo protegido
-- Criar sistema de coleta de metadados e catálogo (crawlers / APIs oficiais)
+3) Testes de integração (local):
+   cd backend
+   npm run test:integration
 
-Se quiser, posso:
-- Gerar o restante das telas (catálogo com tiles, player, perfil de usuário)
-- Criar um backend de exemplo com autenticação e CRUD de usuários (já incluso em backend/)
-- Ajudar com o fluxo de licenciamento e arquitetura de produção
+Produção (expor para a internet, recomendado)
+- Opção 1 — Docker Compose + Traefik (recomendado para automação TLS):
+  1) Configure DNS para apontar seu domínio (ex: filmes-series.com) para o servidor público onde irá executar o Docker host.
+  2) Crie um arquivo .env com as variáveis necessárias:
+     DOMAIN=filmes-series.com
+     LETSENCRYPT_EMAIL=you@example.com
+     JWT_SECRET=uma_chave_forte
+     ADMIN_USER=nome_admin
+     ADMIN_PASS=senha_forte
+  3) Execute:
+     docker compose -f docker-compose.prod.yml up --build -d
+  - O Traefik neste compose tentará obter certificados Let's Encrypt automaticamente para DOMAIN. Certifique-se de que a porta 80/443 do servidor estão abertas e que o domínio resolve para o servidor.
 
-Backend (protótipo)
-- Há um scaffold simples em backend/ com Express que implementa: criação de usuários, login (bcrypt + JWT), listagem e pausa de usuários via users.json.
-- Para rodar o backend (exemplo):
+- Opção 2 — Docker Compose simples (local/VM):
+  - docker compose up --build -d
+  - O arquivo docker-compose.yml monta backend/data em ./backend/data, garantindo persistência do SQLite DB entre reinícios.
+
+Persistência e resiliência das credenciais de administrador
+- A migração para SQLite (backend/data/users.db) significa que as credenciais de administrador permanecem em disco e não são perdidas se o processo cair.
+- Recomenda-se montar backend/data em um volume persistente (host bind mount ou volume) em qualquer ambiente onde a disponibilidade importa.
+- Para maior resiliência (e compartilhamento entre múltiplas instâncias), use um banco de dados gerenciado (Postgres/MySQL) — alterações necessárias no código serão pequenas (trocar camada de persistência).
+- O compose de produção permite definir ADMIN_USER/ADMIN_PASS via variáveis de ambiente para garantir que um admin conhecido exista ao iniciar o serviço.
+
+Backup e restauração
+- Backup rápido (Windows PowerShell):
   cd backend
-  npm install
-  node index.js
-  (ou use o helper PowerShell backend\start-backend.ps1)
-- Deve ficar disponível em https://filmes-series.com
-
-Testes rápidos com curl (exemplos)
-- Login (gera token + refreshToken):
-  curl -X POST https://filmes-series.com/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Davi\",\"password\":\"1234\"}"
-- Introspecção (me):
-  curl https://filmes-series.com/auth/me -H "Authorization: Bearer <TOKEN>"
-- Refresh (rotaciona refresh token):
-  curl -X POST https://filmes-series.com/auth/refresh -H "Content-Type: application/json" -d "{\"refreshToken\":\"<REFRESH_TOKEN>\"}"
-  - Verifique que backend grava o novo refreshToken corretamente.
-- Logout (revoga refresh token):
-  curl -X POST https://filmes-series.com/auth/logout -H "Content-Type: application/json" -d "{\"refreshToken\":\"<REFRESH_TOKEN>\"}"
-
-Local testing with filmes-series.com (recommended)
-- To test locally using the domain filmes-series.com, map the domain to localhost in your hosts file and (optionally) configure TLS for local HTTPS:
-
-  1) Edit hosts file (requires admin privileges):
-     - Windows: edit C:\Windows\System32\drivers\etc\hosts and add:
-       127.0.0.1 filmes-series.com
-     - macOS / Linux: edit /etc/hosts and add:
-       127.0.0.1 filmes-series.com
-
-  2) Start the backend (example):
-     cd backend
-     npm install
-     npm start
-
-  3) Configure the frontend to use lib/config.dart (BACKEND_BASE). By default BACKEND_BASE is set to https://filmes-series.com in lib/config.dart. If you do not intend to use HTTPS locally, change it to http://localhost:4000 or http://10.0.2.2:4000 for Android emulator.
-
-  Optional: enable HTTPS locally with mkcert (recommended if you use HTTPS in the app):
-  - Install mkcert: https://github.com/FiloSottile/mkcert
-  - Run: mkcert -install
-  - Generate certs: mkcert filmes-series.com
-  - Use a small reverse proxy (nginx) or Docker to serve the backend with the generated certs and the filmes-series.com hostname.
-
-Observações:
-- O backend cria um admin inicial (Davi / 1234) se nenhum admin existir — altere essa senha ao rodar em dev/produção.
-- Em produção, defina o env JWT_SECRET em vez do valor padrão.
-
-2) Frontend (Flutter)
-- No diretório raiz do projeto:
-  flutter pub get
-  flutter run
-- Se testar no emulador Android, ajustar base em lib/config.dart para:
-  const String BACKEND_BASE = 'http://10.0.2.2:4000';
-  (ou mantenha https://filmes-series.com se estiver apontando para o domínio)
-
-Segurança e recomendações imediatas
-- Trocar o JWT_SECRET para um valor seguro via variável de ambiente.
-- Alterar a senha do admin padrão criado automaticamente.
-- Em produção, usar um banco de dados real em vez de persistir em users.json.
-- Mover nodemon para devDependencies (se for construir imagem de produção).
-
-Próximos passos que posso executar (você já escolheu manter no main)
-- Posso adicionar um snippet no README com os comandos curl e instruções de execução (recomendado).
-- Posso criar testes de integração (ex.: script Node ou pequenos testes automatizados) para cobrir login → refresh → logout e adicionar CI.
-- Posso criar uma branch/PR se preferir fluxos baseados em PR.
-
-Deseja que eu:
-- adicione o snippet de README com os comandos e instruções de execução? (recomendado)
-- crie testes de integração e um workflow de CI para validar login/refresh/logout automaticamente?
-Diga qual opção prefere ou peça outra ação — se quiser, já adiciono o README com os passos de execução local.
-
-Backend (protótipo)
-- Há um scaffold simples em backend/ com Express que implementa: criação de usuários, login (bcrypt + JWT), listagem e pausa de usuários via users.json.
-- Para rodar o backend (exemplo):
+  .\backup-db.ps1  # cria backend/data/backups/users-YYYY-MM-DD_HH-MM-SS.db
+- Backup com batch wrapper:
   cd backend
-  npm install
-  node index.js
-  (ou use o helper PowerShell backend\start-backend.ps1)
-- Deve ficar disponível em https://filmes-series.com
+  backup-db.bat
+- Para restaurar: pare o serviço, substitua backend/data/users.db pelo arquivo de backup desejado e inicie novamente.
 
-Docker (opcional)
-- Há um Dockerfile para o backend em backend/Dockerfile e um docker-compose.yml na raiz para facilitar testes locais.
-  - Como usar:
-    1) Defina a variável JWT_SECRET localmente (opcional):
-       - Windows PowerShell: $env:JWT_SECRET = 'uma_chave_forte_aqui'
-       - Linux/macOS: export JWT_SECRET=uma_chave_forte_aqui
-    2) Rodar docker-compose:
-       docker compose up --build -d
-    3) O backend ficará disponível em https://filmes-series.com
+Segurança e recomendações
+- Alterar imediatamente o JWT_SECRET e a senha do admin em ambientes públicos.
+- Nunca comitar chaves ou senhas reais neste repositório.
+- Em produção, prefira banco gerenciado (Postgres) e segredos via secret manager.
 
-Admin padrão criado automaticamente
-- Um usuário administrador padrão é criado automaticamente se não existir um admin no backend.
-  - Credenciais iniciais (teste/protótipo):
-    Usuário: Davi
-    Senha: 1234
-  - IMPORTANTE: Mude essa senha imediatamente em ambientes de teste/produção.
+Endpoints úteis
+- POST /auth/login  -> { username, password }
+- GET /auth/me  -> Authorization: Bearer <token>
+- POST /auth/refresh -> { refreshToken }
+- POST /auth/logout -> { refreshToken }
+- POST /admin/backup -> (admin only) cria backup do DB em backend/data/backups/
+
+Suporte e próximos passos
+- Posso automatizar Docker Compose para montar certificados gerados por mkcert e ajustar nginx reverse-proxy, mover nodemon para devDependencies e criar multi-stage Dockerfile para imagens de produção mais leves.
+- Posso também adicionar integração com um banco relacional (Postgres) e um workflow de CI/CD que publica imagens no Docker Hub / GitHub Package Registry (requer credenciais de registro).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
