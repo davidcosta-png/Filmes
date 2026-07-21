@@ -13,6 +13,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// simple health endpoint used by CI to detect backend readiness
+app.get('/auth/health', (req, res) => res.json({ ok: true }));
+
 function loadUsers(){
   if(!fs.existsSync(USERS_FILE)) return [];
   return JSON.parse(fs.readFileSync(USERS_FILE));
@@ -169,5 +172,3 @@ app.delete('/users/:username', verifyToken, adminOnly, (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log('Backend running on', PORT));
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com> 
